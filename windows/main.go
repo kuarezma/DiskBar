@@ -3,9 +3,14 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
@@ -55,6 +60,8 @@ const (
 	NIF_MESSAGE     = 0x00000001
 	NIF_ICON        = 0x00000002
 	NIF_TIP         = 0x00000004
+	NIF_INFO        = 0x00000010
+	NIIF_INFO       = 0x00000001
 
 	MF_STRING       = 0x00000000
 	MF_SEPARATOR    = 0x00000800
@@ -71,6 +78,7 @@ const (
 	KEY_QUERY_VALUE   = 0x0001
 	REG_SZ            = 1
 
+	CMD_UPDATE    = 2000
 	CMD_REFRESH   = 2001
 	CMD_SETTINGS  = 2002
 	CMD_DISKMGMT  = 2003
@@ -133,6 +141,15 @@ type DiskStats struct {
 	UsedPercent float64
 }
 
+var (
+	currentHWnd       uintptr
+	nid               NOTIFYICONDATAW
+	stats             DiskStats
+	currentVersion    = "1.0.0"
+	latestVersion     = ""
+	isUpdateAvailable = false
+)
+
 func getDiskStats(drive string) (DiskStats, error) {
 	drivePtr, err := syscall.UTF16PtrFromString(drive)
 	if err != nil {
@@ -181,15 +198,68 @@ func formatBytes(bytes uint64) string {
 	}
 }
 
-var (
-	currentHWnd uintptr
-	nid         NOTIFYICONDATAW
-	stats       DiskStats
-)
-
 func utf16Ptr(s string) *uint16 {
 	p, _ := syscall.UTF16PtrFromString(s)
 	return p
+}
+
+func showWindowsNotification(title, message string) {
+	copy(nid.SzInfoTitle[:], syscall.StringToUTF16(title))
+	copy(nid.SzInfo[:], syscall.StringToUTF16(message))
+	nid.UFlags |= NIF_INFO
+	nid.DwInfoFlags = NIIF_INFO
+	procShell_NotifyIconW.Call(NIM_MODIFY, uintptr(unsafe.Pointer(&nid)))
+}
+
+func checkUpdates() {
+	client := http.Client{Timeout: 8 * time.Second}
+	resp, err := client.Get("https://api.github.com/repos/kuarezma/DiskBar/releases/latest")
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	var data struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err == nil && data.TagName != "" {
+		cleanRemote := strings.TrimPrefix(strings.TrimPrefix(data.TagName, "v"), "V")
+		cleanCurrent := strings.TrimPrefix(strings.TrimPrefix(currentVersion, "v"), "V")
+		if cleanRemote > cleanCurrent {
+			isUpdateAvailable = true
+			latestVersion = data.TagName
+			showWindowsNotification(
+				"🚀 DiskBar Güncellemesi Mevcut!",
+				fmt.Sprintf("Yeni sürüm: %s hazır. Menüden tek tıkla güncelleyebilirsiniz.", data.TagName),
+			)
+		}
+	}
+}
+
+func performOneClickUpdate() {
+	showWindowsNotification("DiskBar Güncelleniyor...", "En son sürüm indiriliyor...")
+	exePath, err := os.Executable()
+	if err != nil {
+		openURL("https://github.com/kuarezma/DiskBar/releases/latest")
+		return
+	}
+
+	batchScript := fmt.Sprintf(`@echo off
+timeout /t 1 /nobreak >nul
+curl -fsSL https://github.com/kuarezma/DiskBar/releases/latest/download/DiskBar.exe -o "%s.new"
+if exist "%s.new" (
+    move /y "%s.new" "%s"
+    start "" "%s"
+)
+del "%%~f0"
+`, exePath, exePath, exePath, exePath, exePath)
+
+	tmpBatch := filepath.Join(os.TempDir(), "diskbar_update.bat")
+	_ = os.WriteFile(tmpBatch, []byte(batchScript), 0755)
+
+	cmd := exec.Command("cmd.exe", "/c", tmpBatch)
+	_ = cmd.Start()
+	os.Exit(0)
 }
 
 func wndProc(hWnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
@@ -201,8 +271,11 @@ func wndProc(hWnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 		return 0
 	case WM_COMMAND:
 		switch wParam {
+		case CMD_UPDATE:
+			performOneClickUpdate()
 		case CMD_REFRESH:
 			updateStats()
+			checkUpdates()
 		case CMD_SETTINGS:
 			openURL("ms-settings:storagesense")
 		case CMD_DISKMGMT:
@@ -240,7 +313,14 @@ func updateStats() {
 func showContextMenu(hWnd uintptr) {
 	hMenu, _, _ := procCreatePopupMenu.Call()
 
-	// Başlık Kartı
+	// 1. Yeni sürüm varsa en üstte tek tıkla güncelleme butonu
+	if isUpdateAvailable {
+		updateText := fmt.Sprintf("✨ Yeni Sürüm (%s) — Tek Tıkla Güncelle", latestVersion)
+		procAppendMenuW.Call(hMenu, MF_STRING, CMD_UPDATE, uintptr(unsafe.Pointer(utf16Ptr(updateText))))
+		procAppendMenuW.Call(hMenu, MF_SEPARATOR, 0, 0)
+	}
+
+	// 2. Başlık Kartı
 	headerText := fmt.Sprintf("🖴 Disk (C:) — %s Boş", formatBytes(stats.FreeBytes))
 	procAppendMenuW.Call(hMenu, MF_STRING|MF_GRAYED, 0, uintptr(unsafe.Pointer(utf16Ptr(headerText))))
 
@@ -249,14 +329,14 @@ func showContextMenu(hWnd uintptr) {
 
 	procAppendMenuW.Call(hMenu, MF_SEPARATOR, 0, 0)
 
-	// İşlemler
-	procAppendMenuW.Call(hMenu, MF_STRING, CMD_REFRESH, uintptr(unsafe.Pointer(utf16Ptr("⚡ Şimdi Yenile"))))
+	// 3. İşlemler
+	procAppendMenuW.Call(hMenu, MF_STRING, CMD_REFRESH, uintptr(unsafe.Pointer(utf16Ptr("⚡ Şimdi Yenile & Güncelleme Kontrolü"))))
 	procAppendMenuW.Call(hMenu, MF_STRING, CMD_SETTINGS, uintptr(unsafe.Pointer(utf16Ptr("⚙️ Windows Depolama Ayarları..."))))
 	procAppendMenuW.Call(hMenu, MF_STRING, CMD_DISKMGMT, uintptr(unsafe.Pointer(utf16Ptr("🛠️ Disk Yönetimi (diskmgmt)..."))))
 
 	procAppendMenuW.Call(hMenu, MF_SEPARATOR, 0, 0)
 
-	// Otomatik Başlatma
+	// 4. Otomatik Başlatma
 	autostartFlags := uintptr(MF_STRING)
 	if isAutostartEnabled() {
 		autostartFlags |= MF_CHECKED
@@ -265,7 +345,7 @@ func showContextMenu(hWnd uintptr) {
 
 	procAppendMenuW.Call(hMenu, MF_SEPARATOR, 0, 0)
 
-	// Çıkış
+	// 5. Çıkış
 	procAppendMenuW.Call(hMenu, MF_STRING, CMD_EXIT, uintptr(unsafe.Pointer(utf16Ptr("❌ DiskBar'dan Çık"))))
 
 	var pt POINT
@@ -280,7 +360,7 @@ func isAutostartEnabled() bool {
 	r, _, _ := procRegOpenKeyExW.Call(HKEY_CURRENT_USER, uintptr(unsafe.Pointer(keyPath)), 0, KEY_QUERY_VALUE, uintptr(unsafe.Pointer(&hKey)))
 	if r == 0 {
 		defer procRegCloseKey.Call(hKey)
-		return true // Basitleştirilmiş kontrol
+		return true
 	}
 	return false
 }
@@ -333,7 +413,17 @@ func main() {
 	updateStats()
 	procShell_NotifyIconW.Call(NIM_ADD, uintptr(unsafe.Pointer(&nid)))
 
-	// Canlı arka plan güncellemesi (Her 2 saniyede bir)
+	// Açılışta ve her 2 saatte bir güncelleme kontrolü
+	go func() {
+		time.Sleep(3 * time.Second)
+		checkUpdates()
+		for {
+			time.Sleep(2 * time.Hour)
+			checkUpdates()
+		}
+	}()
+
+	// Canlı arka plan disk kontrolü (Her 2 saniyede bir)
 	go func() {
 		for {
 			time.Sleep(2 * time.Second)

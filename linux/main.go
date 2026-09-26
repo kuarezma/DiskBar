@@ -3,15 +3,21 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"syscall"
 	"time"
 )
+
+const currentVersion = "1.0.0"
 
 type DiskStats struct {
 	MountPoint  string
@@ -72,6 +78,60 @@ func sendNotification(title, message string, isUrgent bool) {
 	_ = exec.Command("notify-send", "-u", urgency, "-a", "DiskBar", title, message).Run()
 }
 
+func checkUpdates() {
+	client := http.Client{Timeout: 8 * time.Second}
+	resp, err := client.Get("https://api.github.com/repos/kuarezma/DiskBar/releases/latest")
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	var data struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&data); err == nil && data.TagName != "" {
+		cleanRemote := strings.TrimPrefix(strings.TrimPrefix(data.TagName, "v"), "V")
+		cleanCurrent := strings.TrimPrefix(strings.TrimPrefix(currentVersion, "v"), "V")
+		if cleanRemote > cleanCurrent {
+			sendNotification(
+				"🚀 DiskBar Güncellemesi Mevcut!",
+				fmt.Sprintf("Yeni sürüm: %s yayınlandı. Güncellemek için: diskbar --update", data.TagName),
+				false,
+			)
+		}
+	}
+}
+
+func performUpdate() {
+	fmt.Println("🚀 DiskBar güncelleniyor...")
+	arch := "amd64"
+	if runtime.GOARCH == "arm64" {
+		arch = "arm64"
+	}
+	url := fmt.Sprintf("https://github.com/kuarezma/DiskBar/releases/latest/download/diskbar-linux-%s", arch)
+
+	exePath, err := os.Executable()
+	if err != nil {
+		fmt.Printf("❌ Yürütülebilir dosya yolu bulunamadı: %v\n", err)
+		return
+	}
+
+	cmd := exec.Command("curl", "-fsSL", url, "-o", exePath+".new")
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("❌ İndirme başarısız: %v\n", err)
+		return
+	}
+
+	_ = os.Chmod(exePath+".new", 0755)
+	if err := os.Rename(exePath+".new", exePath); err != nil {
+		fmt.Printf("❌ Dosya değiştirilemedi (sudo gerekebilir): %v\n", err)
+		return
+	}
+
+	fmt.Println("✅ DiskBar başarıyla en son sürüme güncellendi!")
+	sendNotification("DiskBar Güncellendi", "Uygulama başarıyla en son sürüme güncellendi.", false)
+}
+
 func setupAutostart() error {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -101,9 +161,15 @@ X-GNOME-Autostart-enabled=true
 func main() {
 	daemonFlag := flag.Bool("daemon", false, "Arka planda servis olarak çalıştır")
 	autostartFlag := flag.Bool("autostart", false, "Linux oturum açılışında otomatik başlatmayı kur")
+	updateFlag := flag.Bool("update", false, "DiskBar'ı en son sürüme güncelle")
 	intervalFlag := flag.Int("interval", 3, "Saniye cinsinden kontrol aralığı")
 	targetPath := flag.String("path", "/", "İzlenecek disk yolu (Varsayılan: /)")
 	flag.Parse()
+
+	if *updateFlag {
+		performUpdate()
+		return
+	}
 
 	if *autostartFlag {
 		if err := setupAutostart(); err != nil {
@@ -132,6 +198,16 @@ func main() {
 
 	fmt.Printf("🚀 DiskBar Linux Daemon başlatıldı. İzlenen: %s (Kontrol: %d sn)\n", *targetPath, *intervalFlag)
 	sendNotification("DiskBar Başlatıldı", fmt.Sprintf("Canlı Boş Alan: %s (%%% .1f Dolu)", formatBytes(stats.FreeBytes), stats.UsedPercent), false)
+
+	// Arka planda güncelleme denetimi
+	go func() {
+		time.Sleep(5 * time.Second)
+		checkUpdates()
+		for {
+			time.Sleep(2 * time.Hour)
+			checkUpdates()
+		}
+	}()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
