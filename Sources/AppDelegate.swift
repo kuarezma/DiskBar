@@ -30,6 +30,12 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let ws = NSWorkspace.shared.notificationCenter
         ws.addObserver(self, selector: #selector(diskDidChange), name: NSWorkspace.didMountNotification, object: nil)
         ws.addObserver(self, selector: #selector(diskDidChange), name: NSWorkspace.didUnmountNotification, object: nil)
+        
+        // Otomatik güncelleme kontrolcüsünü bağla
+        UpdateManager.shared.onUpdateStatusChanged = { [weak self] in
+            self?.rebuildMenu()
+        }
+        UpdateManager.shared.startPeriodicChecks()
     }
     
     // MARK: - Zamanlayıcı & Güncelleme
@@ -165,12 +171,28 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         cardItem.view = card
         menu.addItem(cardItem)
         
+        // 1b. Eğer yeni sürüm varsa en üstte tek tıkla güncelleme butonu göster
+        if UpdateManager.shared.isUpdateAvailable, let newVer = UpdateManager.shared.latestVersion {
+            menu.addItem(NSMenuItem.separator())
+            let updateItem = NSMenuItem(
+                title: "✨ Yeni Sürüm (\(newVer)) — Tek Tıkla Güncelle",
+                action: #selector(handleOneClickUpdate),
+                keyEquivalent: ""
+            )
+            updateItem.target = self
+            menu.addItem(updateItem)
+        }
+        
         menu.addItem(NSMenuItem.separator())
         
         // 2. Hızlı İşlemler
         let refreshItem = NSMenuItem(title: "⚡ Şimdi Yenile", action: #selector(handleRefresh), keyEquivalent: "r")
         refreshItem.target = self
         menu.addItem(refreshItem)
+        
+        let checkUpdateItem = NSMenuItem(title: "🔄 Güncellemeleri Denetle...", action: #selector(handleCheckUpdate), keyEquivalent: "")
+        checkUpdateItem.target = self
+        menu.addItem(checkUpdateItem)
         
         let storageItem = NSMenuItem(title: "⚙️ Depolama Ayarlarını Aç...", action: #selector(openStorageSettings), keyEquivalent: "")
         storageItem.target = self
@@ -305,6 +327,14 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let binaryPath = Bundle.main.executablePath ?? "/Users/ugurmac/Applications/DiskBar.app/Contents/MacOS/DiskBar"
         config.setAutoStart(enabled: newState, appPath: binaryPath)
         rebuildMenu()
+    }
+    
+    @objc private func handleOneClickUpdate() {
+        UpdateManager.shared.performOneClickUpdate()
+    }
+    
+    @objc private func handleCheckUpdate() {
+        UpdateManager.shared.checkForUpdates(isManual: true)
     }
     
     @objc private func quitApp() {
