@@ -1,0 +1,16 @@
+# Build & Binary Artifacts
+DiskBar
+build/
+*.o
+*.app
+
+# OS Specific
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temp Files
+*.swp
+*.swo
+*~
+*.log
