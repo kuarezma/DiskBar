@@ -1,6 +1,7 @@
 # Build & Binary Artifacts
 DiskBar
 build/
+dist/
 *.o
 *.app
 

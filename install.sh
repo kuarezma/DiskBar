@@ -1,15 +1,32 @@
 #!/bin/bash
 set -e
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-cd "$DIR"
+echo "============================================="
+echo "  🚀 DiskBar for macOS - Otomatik Kurulum   "
+echo "============================================="
 
-echo "🚀 DiskBar Kurulumu Başlatılıyor..."
-echo "1. Uygulama derleniyor..."
-./build.sh
-
-echo "2. Servis başlatılıyor ve otomatik başlatma ayarlanıyor..."
-./setup_service.sh
+# Eğer betik curl | bash şeklinde uzak sunucudan çalıştırılıyorsa:
+if [ ! -f "build.sh" ]; then
+    TMP_DIR=$(mktemp -d)
+    echo "⬇️ DiskBar kaynak kodu indiriliyor..."
+    git clone --depth 1 https://github.com/kuarezma/DiskBar.git "$TMP_DIR"
+    cd "$TMP_DIR"
+    echo "🔨 Uygulama derleniyor..."
+    ./build.sh
+    echo "⚙️ Servis ve otomatik başlatma ayarlanıyor..."
+    ./setup_service.sh
+    rm -rf "$TMP_DIR"
+else
+    # Yerel klon içerisinden çalıştırılıyorsa:
+    echo "🔨 Uygulama derleniyor..."
+    ./build.sh
+    echo "⚙️ Servis ve otomatik başlatma ayarlanıyor..."
+    ./setup_service.sh
+fi
 
 echo ""
-echo "🎉 Kurulum tamamlandı! DiskBar menü çubuğunuzda aktif olarak çalışıyor."
+echo "============================================="
+echo "  🎉 Kurulum başarıyla tamamlandı!"
+echo "  DiskBar ekranınızın sağ üst menü çubuğunda"
+echo "  canlı olarak çalışmaya başladı."
+echo "============================================="
