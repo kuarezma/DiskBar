@@ -69,7 +69,7 @@ public class DiskBarConfig {
     public var refreshInterval: TimeInterval {
         get {
             let val = defaults.double(forKey: kRefreshInterval)
-            return val > 0 ? val : 20.0
+            return val > 0 ? val : 30.0
         }
         set {
             defaults.set(newValue, forKey: kRefreshInterval)

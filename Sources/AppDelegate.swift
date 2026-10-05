@@ -42,7 +42,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     
     private func startTimer() {
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: config.refreshInterval, repeats: true) { [weak self] _ in
             self?.refreshData()
         }
         RunLoop.main.add(timer!, forMode: .common)
