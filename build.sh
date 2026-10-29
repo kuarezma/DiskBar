@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-PROJECT_DIR="/Users/ugurmac/DiskBar"
+PROJECT_DIR="/Users/ugurmac/Documents/PROJELER/DiskBar"
 APP_DIR="/Users/ugurmac/Applications/DiskBar.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"

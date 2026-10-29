@@ -18,12 +18,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Menüyü oluştur ve bağla
         rebuildMenu()
         
-        // Anlık disk izleyiciyi başlat (FSEvents ile diskteki her dosya değişiminde anında tetiklenir)
-        watcher.start { [weak self] newStats in
-            self?.applyStats(newStats)
-        }
-        
-        // APFS arka plan temizlikleri için güvenlik zamanlayıcısı (5 saniyede bir kontrol)
+        // Periyodik güncelleme zamanlayıcısı (Varsayılan: 60 saniyede bir kontrol — sıfır arka plan CPU tüketimi)
         startTimer()
         
         // Sürücü takılma/çıkarılma bildirimlerini dinle
@@ -243,10 +238,10 @@ public class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         viewMenu.addItem(freqHeader)
         
         let intervals: [(String, TimeInterval)] = [
-            ("5 Saniyede Bir", 5.0),
             ("15 Saniyede Bir", 15.0),
-            ("30 Saniyede Bir (Önerilen)", 30.0),
-            ("60 Saniyede Bir", 60.0)
+            ("30 Saniyede Bir", 30.0),
+            ("1 Dakikada Bir (Önerilen)", 60.0),
+            ("5 Dakikada Bir", 300.0)
         ]
         for (label, interval) in intervals {
             let item = NSMenuItem(title: label, action: #selector(changeRefreshInterval(_:)), keyEquivalent: "")
