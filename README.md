@@ -36,7 +36,7 @@
 ## 📸 Screenshots
 
 <p align="center">
-  <b>Menu Bar Real-Time Status Pill</b><br/>
+  <b>Menu Bar Status Pill</b><br/>
   <img src="assets/diskbar_status_v2.png" width="220" alt="DiskBar Menu Bar Status" />
 </p>
 
@@ -51,7 +51,7 @@
 
 | Platform | Download Link | Format | Description |
 |---|---|---|---|
-| 🍏 **macOS** | **[DiskBar.dmg](https://github.com/kuarezma/DiskBar/releases/latest/download/DiskBar.dmg)** | `.dmg` | Native Swift / AppKit app with kernel FSEvents |
+| 🍏 **macOS** | **[DiskBar.dmg](https://github.com/kuarezma/DiskBar/releases/latest/download/DiskBar.dmg)** | `.dmg` | Native Swift / AppKit menu bar app with multi-volume & APFS purgeable stats |
 | 🪟 **Windows** | **[DiskBar-Windows-x64.zip](https://github.com/kuarezma/DiskBar/releases/latest/download/DiskBar-Windows-x64.zip)** / **[DiskBar.exe](https://github.com/kuarezma/DiskBar/releases/latest/download/DiskBar.exe)** | `.zip` / `.exe` | Pure Win32 System Tray executable (No install needed) |
 | 🐧 **Linux (x64)** | **[diskbar-linux-amd64.tar.gz](https://github.com/kuarezma/DiskBar/releases/latest/download/diskbar-linux-amd64.tar.gz)** | `.tar.gz` | Statically linked Linux daemon & desktop notifier |
 | 🐧 **Linux (ARM)** | **[diskbar-linux-arm64.tar.gz](https://github.com/kuarezma/DiskBar/releases/latest/download/diskbar-linux-arm64.tar.gz)** | `.tar.gz` | Raspberry Pi & ARM64 Linux |
@@ -66,7 +66,7 @@
 ### Windows Installation
 1. Download **[DiskBar-Windows-x64.zip](https://github.com/kuarezma/DiskBar/releases/latest/download/DiskBar-Windows-x64.zip)** or **[DiskBar.exe](https://github.com/kuarezma/DiskBar/releases/latest/download/DiskBar.exe)**.
 2. Double-click `DiskBar.exe`. It runs silently in the bottom-right **System Tray** next to the clock.
-3. Right-click the tray icon to view disk stats, refresh, open Windows Storage Sense, or toggle **Run on Windows Startup**.
+3. Right-click the tray icon to view all connected drives, refresh, open Windows Storage Sense, or toggle **Run on Windows Startup**.
 
 ### Linux Installation
 1. Download and extract the archive:
@@ -74,37 +74,41 @@
    tar -xzf diskbar-linux-amd64.tar.gz
    chmod +x diskbar-linux-amd64
    ```
-2. Enable autostart on login:
+2. Enable (or remove) autostart on login:
    ```bash
    ./diskbar-linux-amd64 --autostart
+   ./diskbar-linux-amd64 --remove-autostart
    ```
-3. Run as background service:
+3. Run as background service (default interval: 30s):
    ```bash
-   ./diskbar-linux-amd64 --daemon &
+   ./diskbar-linux-amd64 --daemon --interval 30 &
+   ```
+4. Check version or self-update:
+   ```bash
+   ./diskbar-linux-amd64 --version
+   ./diskbar-linux-amd64 --update
    ```
 
 ---
 
 ## ⚡ Key Features
 
-- **🚀 Real-Time Disk Monitoring:**  
-  - **macOS:** Hooks directly into `CoreServices.FSEventStream` for sub-second updates (< 0.8s) when files are created or deleted.
-  - **Windows:** Pure Win32 background worker monitoring logical drives with 0% CPU.
-  - **Linux:** Fast kernel `statfs` watcher with `notify-send` desktop alerts.
-- **🔔 Automatic Update Notifications (macOS):**  
-  Whenever a new release is pushed on GitHub, installed macOS users receive a native sound/banner notification and can update in-place with a single click.
-- **🍏🪟🐧 100% Native & Zero-Bloat:**  
-  No Electron, no Chromium, no heavyweight runtimes. Single compact binaries under 2 MB with **0.0% idle CPU** on all platforms.
-- **🎛️ Convenient Context Menus:**  
-  Right-click on any platform to access storage management shortcuts, instant refresh, and autostart toggles.
-- **🔒 Privacy & Transparency:**  
-  100% open-source, completely offline, zero telemetry, zero analytics.
+- **🚀 Ultra-Low CPU Disk Monitoring:**
+  - **macOS:** Configurable refresh timer (default 60s, plus instant refresh on menu open and drive mount/unmount), multi-volume selector, APFS purgeable space indicator, and smart low/critical space alerts.
+  - **Windows:** Pure Win32 single-instance tray worker with multi-drive summary, low-space balloon alerts, and toggleable startup registry integration.
+  - **Linux:** Fast kernel `statfs` watcher with low & critical `notify-send` desktop alerts and pure-Go self-updater.
+- **🔔 Automatic Update Notifications (macOS, Windows, Linux):**
+  Semantic version update checks against GitHub Releases with native notifications and one-click in-place updating (no compiler needed on macOS).
+- **🍏🪟🐧 100% Native & Zero-Bloat:**
+  No Electron, no Chromium, no heavyweight runtimes. Single compact binaries with **0.0% idle CPU** on all platforms.
+- **🔒 Privacy & Transparency:**
+  100% open-source, zero telemetry, zero analytics.
 
 ---
 
 ## 🛠️ Build All Platforms from Source
 
-Run the unified cross-platform build script on macOS or Linux:
+Run the unified cross-platform build script on macOS:
 
 ```bash
 git clone https://github.com/kuarezma/DiskBar.git
@@ -116,16 +120,16 @@ cd DiskBar
 
 ## 🇹🇷 Türkçe Açıklama
 
-**DiskBar**, artık **macOS**, **Windows** ve **Linux** işletim sistemlerinin tamamını destekleyen, menü çubuğunda / sistem tepsisinde (System Tray) diskinizde ne kadar boş alan kaldığını canlı olarak gösteren yerel bir uygulamadır.
+**DiskBar**, **macOS**, **Windows** ve **Linux** işletim sistemlerinin tamamını destekleyen, menü çubuğunda / sistem tepsisinde (System Tray) diskinizde ne kadar boş alan kaldığını sıfıra yakın CPU tüketimiyle gösteren yerel bir uygulamadır.
 
-- **macOS:** Menü çubuğunda canlı disk halkası ve kartı (`DiskBar.dmg`).
-- **Windows:** Sağ altta saat yanındaki sistem tepsisinde canlı doluluk ve sağ tık menüsü (`DiskBar.exe`). Kurulum gerektirmez, taşınabilirdir.
-- **Linux:** GNOME / KDE / XFCE bildirimleri ve panel entegrasyonu ile otomatik servis (`diskbar-linux`).
-- **Otomatik Bildirim & Tek Tıkla Güncelleme:** GitHub'da yeni bir sürüm yayınladığınızda kullanıcılar bildirim alarak tek tıkla güncelleyebilir.
+- **macOS:** Menü çubuğunda canlı disk halkası/simgesi, çoklu disk seçimi, APFS temizlenebilir alan göstergesi ve düşük alan uyarıları (`DiskBar.dmg`).
+- **Windows:** Sağ altta saat yanındaki sistem tepsisinde tüm sürücü özeti, aç/kapa otomatik başlatma ve düşük alan uyarıları (`DiskBar.exe`). Kurulum gerektirmez, taşınabilirdir.
+- **Linux:** GNOME / KDE / XFCE bildirimleri, `--autostart` / `--remove-autostart` ve dahili `--update` desteği (`diskbar-linux`).
+- **Otomatik Bildirim & Tek Tıkla Güncelleme:** GitHub'da yeni sürüm yayınlandığında tüm platformlarda bildirim ve tek tıkla güncelleme sunar.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).  
+This project is licensed under the [MIT License](LICENSE).
 Feel free to star ⭐️ the project, open issues, or submit pull requests!
